@@ -68,51 +68,10 @@ app.post('/admin/send-daily-weather', async (req, res) => {
     res.json({ success: true, message: '每日天气预报推送成功' });
   } catch (error) {
     console.error('❌ 每日天气预报推送失败:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : String(error) });
   }
 });
 
-// 发送模板消息的管理接口
-app.post('/admin/send-template', async (req, res) => {
-  try {
-    const { openId, templateId, data } = req.body;
-    
-    if (!openId || !templateId) {
-      return res.status(400).json({ 
-        success: false, 
-        error: '缺少必要参数: openId 和 templateId' 
-      });
-    }
-    
-    await wechatBot.sendTemplateMessage(openId, templateId, data);
-    
-    res.json({ success: true, message: '模板消息发送成功' });
-  } catch (error) {
-    console.error('❌ 模板消息发送失败:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// 发送模板消息的管理接口
-app.post('/admin/send-template', async (req, res) => {
-  try {
-    const { openId, templateId, data } = req.body;
-    
-    if (!openId || !templateId) {
-      return res.status(400).json({ 
-        success: false, 
-        error: '缺少必要参数: openId 和 templateId' 
-      });
-    }
-    
-    await wechatBot.sendTemplateMessage(openId, templateId, data);
-    
-    res.json({ success: true, message: '模板消息发送成功' });
-  } catch (error) {
-    console.error('❌ 模板消息发送失败:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
 
 // 启动服务器
 app.listen(PORT, () => {
