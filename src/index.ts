@@ -1,25 +1,18 @@
 import express from 'express';
 import bodyParser from 'body-parser';
-import dotenv from 'dotenv';
 import cron from 'node-cron';
-// 临时忽略类型错误，后续修复
-// @ts-ignore
 import { WeChatBot } from './wechat-bot';
+import { ConfigManager } from './config/config-manager';
 
-// 加载环境变量
-dotenv.config();
+// 加载配置
+const configManager = ConfigManager.getInstance();
+const config = configManager.getConfig();
 
 const app = express();
 const PORT = process.env.PORT || '8080';
 
-// 微信机器人配置
-const wechatBot = new WeChatBot({
-  appId: process.env.WECHAT_APP_ID!,
-  appSecret: process.env.WECHAT_APP_SECRET!,
-  token: process.env.WECHAT_TOKEN!,
-  mcpUrl: process.env.MCP_URL || 'http://localhost:7777',
-  dailyPushUsers: process.env.DAILY_PUSH_USERS?.split(',') || []
-});
+// 创建微信机器人实例
+const wechatBot = new WeChatBot(config);
 
 // 中间件
 app.use(bodyParser.json());
@@ -30,8 +23,44 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    service: 'wechat-weather-bot'
+    service: 'wechat-intelligent-bot',
+    version: '2.0.0',
+    ai: config.ai.provider
   });
+});
+
+// 服务健康状态
+app.get('/health/services', async (req, res) => {
+  try {
+    const healthStatus = await wechatBot.getServiceHealth();
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      services: healthStatus
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// 服务能力
+app.get('/capabilities', (req, res) => {
+  try {
+    const capabilities = wechatBot.getServiceCapabilities();
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      capabilities
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
 });
 
 // 微信服务器验证
@@ -60,35 +89,151 @@ app.post('/wechat', async (req, res) => {
   }
 });
 
-// 手动触发天气预报推送的管理接口
+// 手动触发每日推送
 app.post('/admin/send-daily-weather', async (req, res) => {
   try {
-    console.log('🌅 开始执行每日天气预报推送...');
+    console.log('🌅 手动触发每日推送...');
     await wechatBot.sendDailyWeatherToAllUsers();
-    res.json({ success: true, message: '每日天气预报推送成功' });
+    res.json({ success: true, message: '每日推送成功' });
   } catch (error) {
-    console.error('❌ 每日天气预报推送失败:', error);
-    res.status(500).json({ success: false, error: error instanceof Error ? error.message : String(error) });
+    console.error('❌ 每日推送失败:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : String(error) 
+    });
   }
 });
 
+// 添加每日推送用户
+app.post('/admin/add-push-user', (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ success: false, error: '缺少userId参数' });
+    }
+    
+    configManager.addDailyPushUser(userId);
+    res.json({ success: true, message: '用户添加成功' });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+// 移除每日推送用户
+app.post('/admin/remove-push-user', (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ success: false, error: '缺少userId参数' });
+    }
+    
+    configManager.removeDailyPushUser(userId);
+    res.json({ success: true, message: '用户移除成功' });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+// 更新AI配置
+app.post('/admin/update-ai-config', (req, res) => {
+  try {
+    const { provider, apiKey, model } = req.body;
+    
+    if (!provider || !apiKey) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '缺少必需参数: provider, apiKey' 
+      });
+    }
+    
+    if (!['deepseek', 'gemini'].includes(provider)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'provider必须是deepseek或gemini' 
+      });
+    }
+    
+    configManager.updateConfig({
+      ai: { provider, apiKey, model }
+    });
+    
+    wechatBot.updateAIConfig(provider, apiKey, model);
+    
+    res.json({ success: true, message: 'AI配置更新成功' });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+// 获取当前配置信息
+app.get('/admin/config', (req, res) => {
+  try {
+    const config = configManager.getConfig();
+    
+    // 隐藏敏感信息
+    const safeConfig = {
+      wechat: {
+        appId: config.wechat.appId,
+        appSecret: config.wechat.appSecret.replace(/./g, '*'),
+        token: config.wechat.token
+      },
+      ai: {
+        provider: config.ai.provider,
+        apiKey: config.ai.apiKey.replace(/./g, '*'),
+        model: config.ai.model
+      },
+      services: Object.entries(config.services).reduce((acc, [key, value]) => {
+        acc[key] = {
+          enabled: value.enabled,
+          hasConfig: Object.keys(value.config).length > 0
+        };
+        return acc;
+      }, {} as any),
+      dailyPush: config.dailyPush
+    };
+    
+    res.json({ success: true, config: safeConfig });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
 
 // 启动服务器
 app.listen(PORT, () => {
-  console.log(`🤖 微信天气机器人服务器已启动`);
+  console.log(`🤖 智能微信机器人服务器已启动 (v2.0.0)`);
   console.log(`📍 端口: ${PORT}`);
+  console.log(`🤖 AI提供商: ${config.ai.provider}`);
   console.log(`🔗 微信回调地址: http://107.173.187.185:${PORT}/wechat`);
   console.log(`🏥 健康检查: http://107.173.187.185:${PORT}/health`);
-  console.log(`⏰ 天气MCP服务器: ${process.env.MCP_URL}`);
+  console.log(`🔧 服务状态: http://107.173.187.185:${PORT}/health/services`);
+  console.log(`📋 服务能力: http://107.173.187.185:${PORT}/capabilities`);
   
-  // 设置每天早上8点推送天气预报
-  cron.schedule('0 8 * * *', async () => {
-    console.log('🌅 开始执行每日天气预报推送...');
-    try {
-      await wechatBot.sendDailyWeatherToAllUsers();
-      console.log('✅ 每日天气预报推送完成');
-    } catch (error) {
-      console.error('❌ 每日天气预报推送失败:', error);
-    }
-  });
+  // 设置定时推送任务
+  if (config.dailyPush.users.length > 0) {
+    cron.schedule(config.dailyPush.time, async () => {
+      console.log('🌅 开始执行每日推送...');
+      try {
+        await wechatBot.sendDailyWeatherToAllUsers();
+        console.log('✅ 每日推送完成');
+      } catch (error) {
+        console.error('❌ 每日推送失败:', error);
+      }
+    });
+    
+    console.log(`⏰ 每日推送已设置: ${config.dailyPush.time}`);
+  } else {
+    console.log('⚠️ 未配置每日推送用户，跳过定时任务');
+  }
 });

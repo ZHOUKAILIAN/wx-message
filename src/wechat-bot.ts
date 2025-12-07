@@ -1,41 +1,12 @@
 import crypto from 'crypto';
 import xml2js from 'xml2js';
 import axios from 'axios';
-import { ProperMCPClient } from './proper-mcp-client';
-
-interface WeChatConfig {
-  appId: string;
-  appSecret: string;
-  token: string;
-  mcpUrl: string;
-  dailyPushUsers: string[];
-}
+import { ServiceManager } from './services/service-manager';
+import { BotConfig } from './services/service-interface';
 
 interface AccessTokenResponse {
   access_token: string;
   expires_in: number;
-}
-
-interface WeatherHourlyData {
-  date: string;
-  hour: string;
-  temp: string;
-  condition: string;
-  humidity: string;
-  windSpeed: string;
-  windDir: string;
-  pressure: string;
-  realFeel: string;
-  iconDay: string;
-  iconNight: string;
-  pop: string;
-  uvi: string;
-  conditionId: string;
-  updatetime: string;
-}
-
-interface WeatherResponse {
-  hourly: WeatherHourlyData[];
 }
 
 interface WeChatMessage {
@@ -49,33 +20,19 @@ interface WeChatMessage {
 }
 
 export class WeChatBot {
-  private config: WeChatConfig;
+  private config: BotConfig;
   private accessToken: string = '';
   private tokenExpiry: number = 0;
-  private mcpClient: ProperMCPClient;
+  private serviceManager: ServiceManager;
 
-  constructor(config: WeChatConfig) {
+  constructor(config: BotConfig) {
     this.config = config;
-    this.mcpClient = new ProperMCPClient(config.mcpUrl);
-    
-    // 初始化时建立MCP连接
-    this.initializeMCPConnection();
-  }
-  
-  // 初始化MCP连接
-  private async initializeMCPConnection(): Promise<void> {
-    try {
-      await this.mcpClient.connect();
-      console.log('✅ MCP客户端已初始化');
-    } catch (error) {
-      console.error('❌ MCP客户端初始化失败:', error);
-      // 不抛出错误，允许继续启动，但会在使用时重试连接
-    }
+    this.serviceManager = new ServiceManager(config);
   }
 
   // 验证微信服务器签名
   verifySignature(signature: string, timestamp: string, nonce: string): boolean {
-    const token = this.config.token;
+    const token = this.config.wechat.token;
     const tmpStr = [token, timestamp, nonce].sort().join('');
     const hash = crypto.createHash('sha1').update(tmpStr).digest('hex');
     return hash === signature;
@@ -90,7 +47,7 @@ export class WeChatBot {
     try {
       console.log('获取微信访问令牌...');
       const response = await axios.get<AccessTokenResponse>(
-        `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${this.config.appId}&secret=${this.config.appSecret}`
+        `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${this.config.wechat.appId}&secret=${this.config.wechat.appSecret}`
       );
       
       this.accessToken = response.data.access_token;
@@ -102,76 +59,6 @@ export class WeChatBot {
       console.error('获取访问令牌失败:', error);
       throw error;
     }
-  }
-
-  // 调用MCP获取天气信息
-  private async getWeatherFromMCP(cityName: string = '杭州市'): Promise<string> {
-    try {
-      console.log(`调用MCP获取${cityName}天气信息...`);
-
-      // 使用MCP客户端获取天气
-      const result = await this.mcpClient.getWeather(cityName);
-      
-      if (result.content && result.content.length > 0) {
-        const weatherText = result.content[0].text;
-        const weatherData = JSON.parse(weatherText) as WeatherResponse;
-        return this.formatWeatherMessage(weatherData, cityName);
-      }
-      
-      return '❌ 获取天气信息失败，请稍后重试';
-    } catch (error) {
-      console.error('调用MCP失败:', error);
-      return '❌ 天气服务暂时不可用，请稍后重试';
-    }
-  }
-
-  // 格式化天气消息
-  private formatWeatherMessage(data: WeatherResponse, cityName: string): string {
-    if (!data.hourly || data.hourly.length === 0) {
-      return `❌ ${cityName}暂无天气数据`;
-    }
-
-    const today = new Date().toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      weekday: 'long'
-    });
-    
-    // 取前8小时的天气数据（更简洁）
-    const hourlyData = data.hourly.slice(0, 8);
-    
-    let message = `📍 ${cityName} 天气预报\n`;
-    message += `📅 ${today}\n`;
-    message += `─`.repeat(20) + '\n\n';
-    
-    hourlyData.forEach((hour, index) => {
-      // 构建时间显示
-      const timeStr = `${hour.date} ${hour.hour}:00`;
-      
-      // 天气图标映射
-      let weatherIcon = '☁️';
-      if (hour.condition.includes('晴')) weatherIcon = '☀️';
-      else if (hour.condition.includes('雨')) weatherIcon = '🌧️';
-      else if (hour.condition.includes('雪')) weatherIcon = '❄️';
-      else if (hour.condition.includes('阴')) weatherIcon = '☁️';
-      else if (hour.condition.includes('多云')) weatherIcon = '⛅';
-      else if (hour.condition.includes('雾')) weatherIcon = '🌫';
-      
-      message += `${timeStr} ${weatherIcon} ${hour.temp}°C ${hour.condition}\n`;
-      message += `💧 湿度:${hour.humidity}% 💨 风速:${hour.windSpeed}m/s\n`;
-      
-      // 每隔几个小时换行
-      if ((index + 1) % 2 === 0 && index < hourlyData.length - 1) {
-        message += '\n';
-      }
-    });
-    
-    message += `\n─`.repeat(20) + '\n';
-    message += `💡 建议根据天气情况合理安排出行~\n`;
-    message += `🔄 数据更新时间: ${new Date().toLocaleTimeString('zh-CN')}`;
-    
-    return message;
   }
 
   // 发送文本消息给用户
@@ -212,34 +99,16 @@ export class WeChatBot {
     let replyContent = '';
     
     if (msgType === 'text') {
-      const lowerContent = content.toLowerCase().trim();
-      
-      if (lowerContent.includes('天气') || lowerContent.includes('weather')) {
-        // 提取城市名称
-        let cityName = '杭州市';
-        const cityMatch = content.match(/(.+?)(?:天气|weather)/i);
-        if (cityMatch && cityMatch[1].trim()) {
-          cityName = cityMatch[1].trim();
-        }
-        
-        replyContent = await this.getWeatherFromMCP(cityName);
-      } else if (content === '帮助' || content === 'help' || content === '?') {
-        replyContent = this.getHelpMessage();
-      } else if (content === '时间' || content === 'time') {
-        const now = new Date();
-        replyContent = `🕐 当前时间：\n📅 ${now.toLocaleDateString('zh-CN')}\n⏰ ${now.toLocaleTimeString('zh-CN')}`;
-      } else if (['id', 'openid', 'whoami'].includes(lowerContent)) {
-        replyContent = `🆔 您的OpenID是：\n${fromUser}\n\n(请复制此ID添加到环境变量 DAILY_PUSH_USERS 中)`;
-      } else {
-        replyContent = '👋 您好！我是天气机器人\n\n📌 使用方法：\n• 发送"天气"查询杭州天气\n• 发送"北京天气"查询北京天气\n• 发送"帮助"查看更多功能';
-      }
+      // 使用服务管理器处理文本消息
+      const response = await this.serviceManager.processRequest(content, fromUser);
+      replyContent = response.content;
     } else if (msgType === 'event') {
       const event = message.Event ? message.Event[0] : '';
       if (event === 'subscribe') {
-        replyContent = '🎉 欢迎关注天气机器人！\n\n📌 使用方法：\n• 发送"天气"查询天气预报\n• 发送"城市名+天气"查询指定城市\n• 发送"帮助"查看使用说明\n\n⏰ 每天早上8点会自动推送天气预报哦~';
+        replyContent = '🎉 欢迎关注智能助手！\n\n🤖 我是一个集成了多种服务的智能机器人，支持：\n• 🌤️ 天气预报查询\n• 📈 股票行情查看\n• 🕐 时间信息获取\n• 🤖 AI智能对话\n\n💡 发送"帮助"查看所有功能，或直接用自然语言告诉我您的需求！';
       }
     } else {
-      replyContent = '🤖 目前只支持文字消息，请发送"天气"查询天气预报';
+      replyContent = '🤖 目前只支持文字消息，请发送任意文字开始对话~';
     }
     
     // 构建回复XML
@@ -258,50 +127,88 @@ export class WeChatBot {
     return replyXml.trim();
   }
 
-  // 获取帮助消息
-  private getHelpMessage(): string {
-    return `🤖 天气机器人使用说明\n\n`
-      + `📌 功能列表：\n`
-      + `• 🌤️ 查询天气预报\n`
-      + `• ⏰ 每日定时推送\n`
-      + `• 🕐 查询当前时间\n\n`
-      + `🔧 使用方法：\n`
-      + `• "天气" - 查询杭州天气\n`
-      + `• "北京天气" - 查询指定城市\n`
-      + `• "时间" - 查看当前时间\n`
-      + `• "帮助" - 显示此说明\n\n`
-      + `💡 小提示：每天早上8点会自动推送天气预报哦~`;
-  }
-
-  // 给所有关注用户发送每日天气预报
+  // 给所有关注用户发送每日推送
   async sendDailyWeatherToAllUsers(): Promise<void> {
     try {
-      console.log('🌅 开始执行每日天气预报推送...');
+      console.log('🌅 开始执行每日推送...');
       
-      const weatherMessage = await this.getWeatherFromMCP('杭州市');
+      const users = this.config.dailyPush.users;
+      const services = this.config.dailyPush.services;
       
-      if (this.config.dailyPushUsers.length === 0) {
-        console.warn('⚠️ 没有配置每日推送用户，但会显示天气信息');
-        console.log('天气信息:', weatherMessage);
+      if (users.length === 0) {
+        console.warn('⚠️ 没有配置每日推送用户');
         return;
       }
       
-      console.log(`📋 准备推送给 ${this.config.dailyPushUsers.length} 个用户`);
+      if (services.length === 0) {
+        console.warn('⚠️ 没有配置推送服务');
+        return;
+      }
       
-      for (const openId of this.config.dailyPushUsers) {
+      console.log(`📋 准备推送给 ${users.length} 个用户，服务: ${services.join(', ')}`);
+      
+      for (const openId of users) {
         try {
-          await this.sendTextMessage(openId, `🌅 早安！每日天气预报\n\n${weatherMessage}`);
-          // 避免频繁发送，间隔1秒
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          let pushContent = `🌅 早安！每日资讯推送\n\n`;
+          
+          for (const serviceName of services) {
+            const response = await this.serviceManager.processRequest(
+              this.getDailyPushTrigger(serviceName),
+              openId
+            );
+            
+            if (response.success) {
+              pushContent += `━`.repeat(20) + '\n';
+              pushContent += response.content + '\n\n';
+            }
+          }
+          
+          pushContent += `💡 祝您有美好的一天！`;
+          
+          await this.sendTextMessage(openId, pushContent);
+          
+          // 避免频繁发送，间隔2秒
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
         } catch (error) {
           console.error(`❌ 推送给用户 ${openId} 失败:`, error);
         }
       }
       
-      console.log('✅ 每日天气预报推送完成');
+      console.log('✅ 每日推送完成');
     } catch (error) {
-      console.error('❌ 每日天气预报推送失败:', error);
+      console.error('❌ 每日推送失败:', error);
       throw error;
     }
+  }
+
+  // 获取每日推送的触发词
+  private getDailyPushTrigger(serviceName: string): string {
+    const triggers: Record<string, string> = {
+      weather: '杭州天气',
+      stock: '苹果股票',
+      time: '时间'
+    };
+    
+    return triggers[serviceName] || serviceName;
+  }
+
+  // 获取服务健康状态
+  async getServiceHealth(): Promise<Record<string, boolean>> {
+    return await this.serviceManager.getHealthStatus();
+  }
+
+  // 获取服务能力
+  getServiceCapabilities(): any {
+    return this.serviceManager.getServiceCapabilities();
+  }
+
+  // 更新AI配置
+  updateAIConfig(provider: 'deepseek' | 'gemini', apiKey: string, model?: string): void {
+    this.config.ai.provider = provider;
+    this.config.ai.apiKey = apiKey;
+    this.config.ai.model = model;
+    
+    this.serviceManager.updateAIConfig(provider, apiKey, model);
   }
 }
