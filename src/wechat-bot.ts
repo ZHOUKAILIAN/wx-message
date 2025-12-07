@@ -228,6 +228,8 @@ export class WeChatBot {
       } else if (content === '时间' || content === 'time') {
         const now = new Date();
         replyContent = `🕐 当前时间：\n📅 ${now.toLocaleDateString('zh-CN')}\n⏰ ${now.toLocaleTimeString('zh-CN')}`;
+      } else if (['id', 'openid', 'whoami'].includes(lowerContent)) {
+        replyContent = `🆔 您的OpenID是：\n${fromUser}\n\n(请复制此ID添加到环境变量 DAILY_PUSH_USERS 中)`;
       } else {
         replyContent = '👋 您好！我是天气机器人\n\n📌 使用方法：\n• 发送"天气"查询杭州天气\n• 发送"北京天气"查询北京天气\n• 发送"帮助"查看更多功能';
       }
