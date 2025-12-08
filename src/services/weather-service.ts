@@ -59,8 +59,12 @@ export class WeatherService extends BaseService {
   }
 
   private async initializeMCPConnection(): Promise<void> {
-    // 不在构造函数中立即连接，而是在第一次使用时连接
-    console.log('🌤️ 天气服务已初始化，将在首次使用时连接MCP');
+    try {
+      await this.mcpClient.connect();
+      console.log('✅ 天气服务MCP连接已建立');
+    } catch (error) {
+      console.error('❌ 天气服务MCP连接失败:', error);
+    }
   }
 
   canHandle(request: ServiceRequest): boolean {

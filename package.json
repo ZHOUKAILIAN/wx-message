@@ -1,20 +1,21 @@
 {
-  "name": "wechat-intelligent-bot",
-  "version": "2.0.0",
-  "description": "基于插件架构和AI智能路由的微信公众号机器人",
+  "name": "wechat-weather-bot",
+  "version": "1.0.0",
+  "description": "微信公众号天气机器人，调用天气MCP服务器",
   "main": "src/index.ts",
   "scripts": {
     "start": "tsx src/index.ts",
+    "start:v2": "tsx src/index-v2.ts",
     "dev": "tsx --watch src/index.ts",
-    "build": "tsc"
+    "dev:v2": "tsx --watch src/index-v2.ts",
+    "build": "tsc",
+    "build:v2": "tsc"
   },
   "keywords": [
     "wechat",
-    "ai",
-    "bot",
-    "plugin",
-    "intelligent",
-    "mcp"
+    "weather",
+    "mcp",
+    "bot"
   ],
   "author": "zhoukailian",
   "license": "MIT",

@@ -43,16 +43,14 @@ export class MCPClient extends EventEmitter {
     try {
       console.log('🔗 建立MCP SSE连接...');
       
-      // 建立SSE连接，增加超时设置
+      // 建立SSE连接
       const response = await axios.get(`${this.mcpUrl}/mcp`, {
         responseType: 'stream',
         headers: {
           'Accept': 'text/event-stream',
           'Cache-Control': 'no-cache',
           'Connection': 'keep-alive',
-        },
-        timeout: 10000, // 10秒超时
-        maxRedirects: 0
+        }
       });
 
       this.isConnected = true;
