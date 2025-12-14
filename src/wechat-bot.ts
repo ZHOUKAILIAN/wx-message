@@ -92,48 +92,72 @@ export class WeChatBot {
 
   // 处理接收到的消息
   async handleMessage(xmlData: string | Buffer): Promise<string> {
-    const parser = new xml2js.Parser();
-    const result = await parser.parseStringPromise(xmlData);
-    const message = result.xml as WeChatMessage;
+    try {
+      // 确保数据是字符串格式
+      const xmlString = Buffer.isBuffer(xmlData) ? xmlData.toString('utf8') : xmlData;
 
-    const fromUser = message.FromUserName[0];
-    const toUser = message.ToUserName[0];
-    const content = message.Content ? message.Content[0] : "";
-    const msgType = message.MsgType[0];
-    let replyContent = "";
+      // 打印接收到的XML数据用于调试
+      console.log("📥 接收到的XML数据:", xmlString);
 
-    if (msgType === "text") {
-      // 使用服务管理器处理文本消息
-      const response = await this.serviceManager.processRequest(
-        content,
-        fromUser
-      );
-      replyContent = response.content;
-    } else if (msgType === "event") {
-      const event = message.Event ? message.Event[0] : "";
-      if (event === "subscribe") {
-        replyContent = `🎉 欢迎关注智能助手！
+      // 检查是否为有效的XML
+      if (!xmlString.trim().startsWith('<?xml') && !xmlString.trim().startsWith('<xml')) {
+        throw new Error(`Invalid XML format: ${xmlString.substring(0, 100)}...`);
+      }
+
+      const parser = new xml2js.Parser();
+      const result = await parser.parseStringPromise(xmlString);
+      const message = result.xml as WeChatMessage;
+
+      const fromUser = message.FromUserName[0];
+      const toUser = message.ToUserName[0];
+      const content = message.Content ? message.Content[0] : "";
+      const msgType = message.MsgType[0];
+      let replyContent = "";
+
+      if (msgType === "text") {
+        // 使用服务管理器处理文本消息
+        const response = await this.serviceManager.processRequest(
+          content,
+          fromUser
+        );
+        replyContent = response.content;
+      } else if (msgType === "event") {
+        const event = message.Event ? message.Event[0] : "";
+        if (event === "subscribe") {
+          replyContent = `🎉 欢迎关注智能助手！
             🤖 我是一个集成了多种服务的智能机器人，支持：
             • 🌤️ 天气预报查询
             • 📈 股票行情查看
             • 🕐 时间信息获取
             • 🤖 AI智能对话
             💡 发送"帮助"查看所有功能，或直接用自然语言告诉我您的需求！`;
+        }
+      } else {
+        replyContent = "🤖 目前只支持文字消息，请发送任意文字开始对话~";
       }
-    } else {
-      replyContent = "🤖 目前只支持文字消息，请发送任意文字开始对话~";
-    }
 
-    // 构建回复XML
-    const replyXml = `<xml>
+      // 构建回复XML
+      const replyXml = `<xml>
 <ToUserName><![CDATA[${fromUser}]]></ToUserName>
 <FromUserName><![CDATA[${toUser}]]></FromUserName>
 <CreateTime>${Math.floor(Date.now() / 1000)}</CreateTime>
 <MsgType><![CDATA[text]]></MsgType>
 <Content><![CDATA[${replyContent}]]></Content>
 </xml>`;
-    console.log("📤 回复XML:", replyXml);
-    return replyXml;
+      console.log("📤 回复XML:", replyXml);
+      return replyXml;
+    } catch (error) {
+      console.error("❌ 处理消息失败:", error);
+      // 返回错误消息
+      const errorReply = `<xml>
+<ToUserName><![CDATA[unknown]]></ToUserName>
+<FromUserName><![CDATA[bot]]></FromUserName>
+<CreateTime>${Math.floor(Date.now() / 1000)}</CreateTime>
+<MsgType><![CDATA[text]]></MsgType>
+<Content><![CDATA[🤖 系统暂时出现问题，请稍后重试]]></Content>
+</xml>`;
+      return errorReply;
+    }
   }
 
   // 给所有关注用户发送每日推送

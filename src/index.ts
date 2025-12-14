@@ -16,6 +16,8 @@ const wechatBot = new WeChatBot(config);
 
 // 中间件
 app.use(bodyParser.json());
+// 专门为微信XML消息配置解析器
+app.use('/wechat', express.raw({ type: ['text/xml', 'application/xml', 'text/plain'] }));
 app.use(bodyParser.text({ type: "text/xml" }));
 
 // 健康检查
@@ -92,20 +94,6 @@ app.post("/wechat", async (req, res) => {
     res.send(result);
   } catch (error) {
     console.error("❌ 处理消息失败:", error);
-    // 返回一个简单的错误回复给用户
-    const errorReply = `<xml>
-<ToUserName><![CDATA[${
-      req.body.match(/<FromUserName><!\[CDATA\[(.*?)\]\]>/)?.[1] || "unknown"
-    }]]></ToUserName>
-<FromUserName><![CDATA[${
-      req.body.match(/<ToUserName><!\[CDATA\[(.*?)\]\]>/)?.[1] || "unknown"
-    }]]></FromUserName>
-<CreateTime>${Math.floor(Date.now() / 1000)}</CreateTime>
-<MsgType><![CDATA[text]]></MsgType>
-<Content><![CDATA[🤖 系统暂时出现问题，请稍后重试]]></Content>
-</xml>`;
-    res.set("Content-Type", "text/xml");
-    res.send(errorReply);
   }
 });
 

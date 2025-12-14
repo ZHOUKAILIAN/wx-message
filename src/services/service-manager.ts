@@ -156,28 +156,20 @@ export class ServiceManager {
 • 比如："查询天气"、"股票行情"等
 
 请问您希望我帮您做什么呢？`,
-          suggestions: [
-            "帮助",
-            "查看功能",
-            "天气查询",
-            "股票查询",
-            "当前时间"
-          ]
+          suggestions: ["帮助", "查看功能", "天气查询", "股票查询", "当前时间"],
         };
       }
 
       // 选择服务
       let service: BaseService;
 
-      service = this.services.get(intent.serviceName) || this.unknownService || new UnknownService();
+      service =
+        this.services.get(intent.serviceName) ||
+        this.unknownService ||
+        new UnknownService();
       request.parameters = intent.parameters;
-
-      console.log(`🎯 选择服务: ${service.name}`);
-
       // 调用服务
       const serviceResponse = await service.handle(request);
-      console.log(`📤 服务响应:`, serviceResponse);
-
       // 如果启用了AI且不是帮助服务，使用AI生成回复
       if (this.shouldUseAI(input, service.name)) {
         const aiResponse = await this.aiRouter.generateResponse({

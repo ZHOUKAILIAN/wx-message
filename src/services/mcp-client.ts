@@ -107,8 +107,6 @@ export class MCPClient extends EventEmitter {
   // 处理SSE数据
   private handleSSEData(data: string): void {
     try {
-      console.log("📥 收到SSE原始数据:", data);
-
       // 提取sessionId
       if (data.includes("sessionId")) {
         const sessionIdMatch = data.match(/sessionId=([^&\s]+)/);
@@ -128,8 +126,6 @@ export class MCPClient extends EventEmitter {
 
       // 尝试解析JSON数据
       const response = JSON.parse(data) as MCPResponse;
-
-      console.log("📥 收到MCP JSON响应:", response);
 
       // 处理pending请求
       if (response && response.id && this.pendingRequests.has(response.id)) {
