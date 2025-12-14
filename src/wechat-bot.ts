@@ -129,18 +129,17 @@ export class WeChatBot {
 
     // 构建回复XML
     const timestamp = Math.floor(Date.now() / 1000);
-    const replyXml = `
-      <xml>
-        <ToUserName><![CDATA[${fromUser}]]></ToUserName>
-        <FromUserName><![CDATA[${toUser}]]></FromUserName>
-        <CreateTime>${timestamp}</CreateTime>
-        <MsgType><![CDATA[text]]></MsgType>
-        <Content><![CDATA[${replyContent}]]></Content>
-      </xml>
-    `;
+    const replyXml = `<xml>
+<ToUserName><![CDATA[${fromUser}]]></ToUserName>
+<FromUserName><![CDATA[${toUser}]]></FromUserName>
+<CreateTime>${timestamp}</CreateTime>
+<MsgType><![CDATA[text]]></MsgType>
+<Content><![CDATA[${replyContent}]]></Content>
+</xml>`;
 
-    console.log("📤 准备回复:", replyContent.substring(0, 50) + "...");
-    return replyXml.trim();
+    console.log("📤 准备回复:", replyContent.substring(0, 100) + "...");
+    console.log("📤 回复XML:", replyXml);
+    return replyXml;
   }
 
   // 给所有关注用户发送每日推送

@@ -80,12 +80,23 @@ app.get('/wechat', (req, res) => {
 // 处理微信消息
 app.post('/wechat', async (req, res) => {
   try {
+    console.log('📨 收到微信消息:', req.body);
     const result = await wechatBot.handleMessage(req.body);
+    console.log('📤 返回XML回复:', result);
     res.set('Content-Type', 'text/xml');
     res.send(result);
   } catch (error) {
-    console.error('处理消息失败:', error);
-    res.status(500).send('Error processing message');
+    console.error('❌ 处理消息失败:', error);
+    // 返回一个简单的错误回复给用户
+    const errorReply = `<xml>
+<ToUserName><![CDATA[${req.body.match(/<FromUserName><!\[CDATA\[(.*?)\]\]>/)?.[1] || 'unknown'}]]></ToUserName>
+<FromUserName><![CDATA[${req.body.match(/<ToUserName><!\[CDATA\[(.*?)\]\]>/)?.[1] || 'unknown'}]]></FromUserName>
+<CreateTime>${Math.floor(Date.now() / 1000)}</CreateTime>
+<MsgType><![CDATA[text]]></MsgType>
+<Content><![CDATA[🤖 系统暂时出现问题，请稍后重试]]></Content>
+</xml>`;
+    res.set('Content-Type', 'text/xml');
+    res.send(errorReply);
   }
 });
 

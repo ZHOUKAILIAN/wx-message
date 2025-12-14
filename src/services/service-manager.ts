@@ -143,13 +143,33 @@ export class ServiceManager {
       const intent = await this.aiRouter.analyzeIntent(input);
       console.log(`🧠 AI意图分析:`, intent);
 
+      // 如果没有识别到意图，直接询问用户
+      if (intent.serviceName === "unknown" || intent.confidence === 0) {
+        console.log(`❓ 未识别到意图，直接询问用户`);
+        return {
+          success: true,
+          content: `🤔 我没有完全理解您的需求："${input}"
+
+💡 您可以尝试：
+• 发送"帮助"查看所有功能
+• 更具体地描述您的需求
+• 比如："查询天气"、"股票行情"等
+
+请问您希望我帮您做什么呢？`,
+          suggestions: [
+            "帮助",
+            "查看功能",
+            "天气查询",
+            "股票查询",
+            "当前时间"
+          ]
+        };
+      }
+
       // 选择服务
       let service: BaseService;
 
-      service =
-        (intent.serviceName && this.services.get(intent.serviceName)) ||
-        this.unknownService ||
-        new UnknownService();
+      service = this.services.get(intent.serviceName) || this.unknownService || new UnknownService();
       request.parameters = intent.parameters;
 
       console.log(`🎯 选择服务: ${service.name}`);
