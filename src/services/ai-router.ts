@@ -92,7 +92,10 @@ ${capabilitiesText}
       );
 
       const content = response.data.choices[0].message.content;
-      const result = JSON.parse(content);
+      const result = this.safeParseJson(content);
+      if (!result) {
+        throw new Error("AI 返回内容非 JSON，可解析的片段不存在");
+      }
 
       return {
         serviceName: result.serviceName || "unknown",
@@ -111,6 +114,38 @@ ${capabilitiesText}
     }
   }
 
+  /**
+   * 尝试解析 AI 返回的 JSON，兼容被包裹在 ```json ``` 或附带额外文本的情况
+   */
+  private safeParseJson(content: string): any | null {
+    try {
+      return JSON.parse(content);
+    } catch (err) {
+      // 兼容 ```json ... ``` 形式
+      const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
+      if (fenced) {
+        try {
+          return JSON.parse(fenced[1].trim());
+        } catch {
+          /* ignore */
+        }
+      }
+
+      // 退一步：截取第一个 { 到最后一个 } 尝试解析
+      const start = content.indexOf("{");
+      const end = content.lastIndexOf("}");
+      if (start !== -1 && end !== -1 && end > start) {
+        const slice = content.slice(start, end + 1);
+        try {
+          return JSON.parse(slice);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    return null;
+  }
+
   async generateResponse(context: {
     userMessage: string;
     serviceResponse: any;
@@ -126,7 +161,8 @@ ${capabilitiesText}
 服务名称：${serviceName}
 服务响应：${JSON.stringify(serviceResponse)}
 
-请将服务响应转换为自然、友好的中文回复。要求：
+请将服务响应转换为自然、友好的中文回复。要求
+：
 1. 保持回复简洁明了
 2. 适当使用emoji增强可读性
 3. 如果服务返回错误信息，给出友好的错误提示

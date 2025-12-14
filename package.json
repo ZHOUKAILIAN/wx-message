@@ -5,12 +5,9 @@
   "main": "src/index.ts",
   "scripts": {
     "start": "tsx src/index.ts",
-    "start:v2": "tsx src/index-v2.ts",
     "dev": "tsx --watch src/index.ts",
-    "dev:v2": "tsx --watch src/index-v2.ts",
     "check:ai": "tsx src/tools/check-ai.ts",
-    "build": "tsc",
-    "build:v2": "tsc"
+    "build": "tsc"
   },
   "keywords": [
     "wechat",
