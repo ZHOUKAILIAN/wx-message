@@ -94,14 +94,21 @@ export class WeChatBot {
   async handleMessage(xmlData: string | Buffer): Promise<string> {
     try {
       // 确保数据是字符串格式
-      const xmlString = Buffer.isBuffer(xmlData) ? xmlData.toString('utf8') : xmlData;
+      const xmlString = Buffer.isBuffer(xmlData)
+        ? xmlData.toString("utf8")
+        : xmlData;
 
       // 打印接收到的XML数据用于调试
       console.log("📥 接收到的XML数据:", xmlString);
 
       // 检查是否为有效的XML
-      if (!xmlString.trim().startsWith('<?xml') && !xmlString.trim().startsWith('<xml')) {
-        throw new Error(`Invalid XML format: ${xmlString.substring(0, 100)}...`);
+      if (
+        !xmlString.trim().startsWith("<?xml") &&
+        !xmlString.trim().startsWith("<xml")
+      ) {
+        throw new Error(
+          `Invalid XML format: ${xmlString.substring(0, 100)}...`
+        );
       }
 
       const parser = new xml2js.Parser();
@@ -144,7 +151,6 @@ export class WeChatBot {
 <MsgType><![CDATA[text]]></MsgType>
 <Content><![CDATA[${replyContent}]]></Content>
 </xml>`;
-      console.log("📤 回复XML:", replyXml);
       return replyXml;
     } catch (error) {
       console.error("❌ 处理消息失败:", error);

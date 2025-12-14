@@ -134,15 +134,10 @@ export class ServiceManager {
     };
 
     try {
-      console.log(`🔄 处理用户请求: "${input}"`);
-
-      // 确保 MCP 工具服务已加载（从 MCP tools/list 自动发现功能）
       await this.ensureMCPServicesInitialized();
 
       // 使用AI分析意图
       const intent = await this.aiRouter.analyzeIntent(input);
-      console.log(`🧠 AI意图分析:`, intent);
-
       // 如果没有识别到意图，直接询问用户
       if (intent.serviceName === "unknown" || intent.confidence === 0) {
         console.log(`❓ 未识别到意图，直接询问用户`);
@@ -171,20 +166,15 @@ export class ServiceManager {
       // 调用服务
       const serviceResponse = await service.handle(request);
       // 如果启用了AI且不是帮助服务，使用AI生成回复
-      if (this.shouldUseAI(input, service.name)) {
-        const aiResponse = await this.aiRouter.generateResponse({
-          userMessage: input,
-          serviceResponse,
-          serviceName: service.name,
-        });
-
-        return {
-          ...serviceResponse,
-          content: aiResponse,
-        };
-      }
-
-      return serviceResponse;
+      const aiResponse = await this.aiRouter.generateResponse({
+        userMessage: input,
+        serviceResponse,
+        serviceName: service.name,
+      });
+      return {
+        ...serviceResponse,
+        content: aiResponse,
+      };
     } catch (error) {
       console.error("处理请求失败:", error);
       return {
@@ -193,24 +183,6 @@ export class ServiceManager {
         error: error instanceof Error ? error.message : String(error),
       };
     }
-  }
-
-  /**
-   * 判断是否应该使用AI生成回复
-   */
-  private shouldUseAI(input: string, serviceName: string): boolean {
-    // 帮助服务直接返回格式化的内容
-    if (serviceName === "help") {
-      return false;
-    }
-
-    // 简单的时间查询不需要AI
-    if (serviceName === "time" && input.length < 10) {
-      return false;
-    }
-
-    // 其他情况使用AI
-    return true;
   }
 
   /**

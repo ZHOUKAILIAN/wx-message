@@ -54,7 +54,7 @@ const mockWeChatMessages = {
   <FromUserName><![CDATA[test-user-123]]></FromUserName>
   <CreateTime>${Math.floor(Date.now() / 1000)}</CreateTime>
   <MsgType><![CDATA[text]]></MsgType>
-  <Content><![CDATA[北京天气怎么样]]></Content>
+  <Content><![CDATA[告诉我北京的天气，一句话，不要有其他符号]]></Content>
   <MsgId>${Date.now()}004</MsgId>
 </xml>`,
   },

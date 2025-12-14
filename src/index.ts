@@ -17,7 +17,10 @@ const wechatBot = new WeChatBot(config);
 // 中间件
 app.use(bodyParser.json());
 // 专门为微信XML消息配置解析器
-app.use('/wechat', express.raw({ type: ['text/xml', 'application/xml', 'text/plain'] }));
+app.use(
+  "/wechat",
+  express.raw({ type: ["text/xml", "application/xml", "text/plain"] })
+);
 app.use(bodyParser.text({ type: "text/xml" }));
 
 // 健康检查
