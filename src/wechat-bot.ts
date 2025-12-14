@@ -49,7 +49,6 @@ export class WeChatBot {
     }
 
     try {
-      console.log("获取微信访问令牌...");
       const response = await axios.get<AccessTokenResponse>(
         `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${this.config.wechat.appId}&secret=${this.config.wechat.appSecret}`
       );
@@ -57,10 +56,8 @@ export class WeChatBot {
       this.accessToken = response.data.access_token;
       this.tokenExpiry = Date.now() + (response.data.expires_in - 300) * 1000; // 提前5分钟过期
 
-      console.log("访问令牌获取成功");
       return this.accessToken;
     } catch (error) {
-      console.error("获取访问令牌失败:", error);
       throw error;
     }
   }
@@ -91,28 +88,10 @@ export class WeChatBot {
   }
 
   // 处理接收到的消息
-  async handleMessage(xmlData: string | Buffer): Promise<string> {
+  async handleMessage(xmlData: string) {
     try {
-      // 确保数据是字符串格式
-      const xmlString = Buffer.isBuffer(xmlData)
-        ? xmlData.toString("utf8")
-        : xmlData;
-
-      // 打印接收到的XML数据用于调试
-      console.log("📥 接收到的XML数据:", xmlString);
-
-      // 检查是否为有效的XML
-      if (
-        !xmlString.trim().startsWith("<?xml") &&
-        !xmlString.trim().startsWith("<xml")
-      ) {
-        throw new Error(
-          `Invalid XML format: ${xmlString.substring(0, 100)}...`
-        );
-      }
-
       const parser = new xml2js.Parser();
-      const result = await parser.parseStringPromise(xmlString);
+      const result = await parser.parseStringPromise(xmlData);
       const message = result.xml as WeChatMessage;
 
       const fromUser = message.FromUserName[0];
@@ -122,22 +101,23 @@ export class WeChatBot {
       let replyContent = "";
 
       if (msgType === "text") {
-        // 使用服务管理器处理文本消息
-        const response = await this.serviceManager.processRequest(
-          content,
-          fromUser
-        );
-        replyContent = response.content;
+        // 立即返回处理中的消息，然后异步处理
+        replyContent = "🤖 正在为您处理，请稍候...";
+
+        // 异步处理实际请求（不阻塞响应）
+        this.processMessageAsync(content, fromUser).catch(error => {
+          console.error("❌ 异步处理消息失败:", error);
+        });
       } else if (msgType === "event") {
         const event = message.Event ? message.Event[0] : "";
         if (event === "subscribe") {
           replyContent = `🎉 欢迎关注智能助手！
-            🤖 我是一个集成了多种服务的智能机器人，支持：
-            • 🌤️ 天气预报查询
-            • 📈 股票行情查看
-            • 🕐 时间信息获取
-            • 🤖 AI智能对话
-            💡 发送"帮助"查看所有功能，或直接用自然语言告诉我您的需求！`;
+🤖 我是一个集成了多种服务的智能机器人，支持：
+• 🌤️ 天气预报查询
+• 📈 股票行情查看
+• 🕐 时间信息获取
+• 🤖 AI智能对话
+💡 发送"帮助"查看所有功能，或直接用自然语言告诉我您的需求！`;
         }
       } else {
         replyContent = "🤖 目前只支持文字消息，请发送任意文字开始对话~";
@@ -154,16 +134,53 @@ export class WeChatBot {
       return replyXml;
     } catch (error) {
       console.error("❌ 处理消息失败:", error);
-      // 返回错误消息
-      const errorReply = `<xml>
-<ToUserName><![CDATA[unknown]]></ToUserName>
-<FromUserName><![CDATA[bot]]></FromUserName>
+      // 确保即使出错也返回响应
+      return this.buildErrorResponse("系统错误，请稍后重试");
+    }
+  }
+
+  // 异步处理消息（不阻塞微信响应）
+  private async processMessageAsync(content: string, fromUser: string): Promise<void> {
+    try {
+      console.log(`🔄 开始异步处理消息: ${content}`);
+
+      // 设置超时保护
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("处理超时")), 30000); // 30秒超时
+      });
+
+      const processPromise = this.serviceManager.processRequest(content, fromUser);
+
+      // 使用Promise.race确保不会无限等待
+      const response = await Promise.race([processPromise, timeoutPromise]);
+
+      if (response.success) {
+        // 通过客服消息API发送实际回复
+        await this.sendTextMessage(fromUser, response.content);
+        console.log(`✅ 异步处理完成，已发送回复给用户: ${fromUser}`);
+      } else {
+        await this.sendTextMessage(fromUser, "❌ 处理失败，请稍后重试");
+        console.error(`❌ 服务处理失败: ${response.error}`);
+      }
+    } catch (error) {
+      console.error("❌ 异步处理异常:", error);
+      try {
+        await this.sendTextMessage(fromUser, "❌ 系统异常，请稍后重试");
+      } catch (sendError) {
+        console.error("❌ 发送错误消息失败:", sendError);
+      }
+    }
+  }
+
+  // 构建错误响应XML
+  private buildErrorResponse(errorMessage: string): string {
+    return `<xml>
+<ToUserName><![CDATA[error]]></ToUserName>
+<FromUserName><![CDATA[system]]></FromUserName>
 <CreateTime>${Math.floor(Date.now() / 1000)}</CreateTime>
 <MsgType><![CDATA[text]]></MsgType>
-<Content><![CDATA[🤖 系统暂时出现问题，请稍后重试]]></Content>
+<Content><![CDATA[${errorMessage}]]></Content>
 </xml>`;
-      return errorReply;
-    }
   }
 
   // 给所有关注用户发送每日推送

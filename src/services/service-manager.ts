@@ -19,6 +19,7 @@ export class ServiceManager {
   private mcpClient: MCPClient | null = null;
   private mcpInitPromise: Promise<void> | null = null;
   private mcpToolServiceNames: Set<string> = new Set();
+  private mcpInitialized: boolean = false;
 
   constructor(private config: BotConfig) {
     // 初始化AI路由器
@@ -60,6 +61,12 @@ export class ServiceManager {
   }
 
   private async ensureMCPServicesInitialized(): Promise<void> {
+    // 如果已经初始化完成，直接返回
+    if (this.mcpInitialized) {
+      return;
+    }
+
+    // 如果正在初始化，等待完成
     if (this.mcpInitPromise) {
       return this.mcpInitPromise;
     }
@@ -87,8 +94,14 @@ export class ServiceManager {
 
         this.updateHelpServiceCapabilities();
         this.updateAIRouterCapabilities();
+
+        // 标记为已初始化
+        this.mcpInitialized = true;
+        console.log("✅ MCP 服务初始化完成");
       } catch (error) {
         console.error("❌ 初始化 MCP 工具服务失败:", error);
+        // 初始化失败时也标记为完成，避免无限重试
+        this.mcpInitialized = true;
       }
     })();
 
