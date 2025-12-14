@@ -1,5 +1,5 @@
-import dotenv from 'dotenv';
-import { BotConfig } from '../services/service-interface';
+import dotenv from "dotenv";
+import { BotConfig } from "../services/service-interface";
 
 /**
  * 配置管理器
@@ -7,7 +7,7 @@ import { BotConfig } from '../services/service-interface';
  */
 export class ConfigManager {
   private static instance: ConfigManager;
-  private config: BotConfig;
+  private config!: BotConfig;
 
   private constructor() {
     this.loadConfig();
@@ -32,69 +32,81 @@ export class ConfigManager {
       wechat: {
         appId: process.env.WECHAT_APP_ID!,
         appSecret: process.env.WECHAT_APP_SECRET!,
-        token: process.env.WECHAT_TOKEN!
+        token: process.env.WECHAT_TOKEN!,
       },
       ai: {
-        provider: (process.env.AI_PROVIDER as 'deepseek' | 'gemini') || 'deepseek',
+        provider:
+          (process.env.AI_PROVIDER as "deepseek" | "gemini") || "deepseek",
         apiKey: process.env.AI_API_KEY!,
-        model: process.env.AI_MODEL
+        model: process.env.AI_MODEL,
       },
       services: {
         weather: {
-          enabled: process.env.WEATHER_SERVICE_ENABLED !== 'false',
+          enabled: process.env.WEATHER_SERVICE_ENABLED !== "false",
           config: {
-            mcpUrl: process.env.MCP_URL || 'http://localhost:7777'
-          }
+            mcpUrl: process.env.MCP_URL || "http://localhost:7777",
+          },
         },
         stock: {
-          enabled: process.env.STOCK_SERVICE_ENABLED !== 'false',
+          enabled: process.env.STOCK_SERVICE_ENABLED !== "false",
           config: {
             // 股票服务配置（如果需要API密钥等）
-          }
+          },
         },
         time: {
-          enabled: process.env.TIME_SERVICE_ENABLED !== 'false',
-          config: {}
+          enabled: process.env.TIME_SERVICE_ENABLED !== "false",
+          config: {},
         },
         help: {
           enabled: true,
-          config: {}
-        }
+          config: {},
+        },
       },
       dailyPush: {
-        users: process.env.DAILY_PUSH_USERS?.split(',') || [],
-        time: process.env.DAILY_PUSH_TIME || '0 8 * * *',
-        services: process.env.DAILY_PUSH_SERVICES?.split(',') || ['weather', 'time']
-      }
+        users: process.env.DAILY_PUSH_USERS?.split(",") || [],
+        time: process.env.DAILY_PUSH_TIME || "0 8 * * *",
+        services: process.env.DAILY_PUSH_SERVICES?.split(",") || [
+          "weather",
+          "time",
+        ],
+      },
     };
 
-    console.log('✅ 配置加载完成');
+    console.log("✅ 配置加载完成");
     this.logConfigSummary();
   }
 
   private validateRequiredEnvVars(): void {
     const requiredVars = [
-      'WECHAT_APP_ID',
-      'WECHAT_APP_SECRET', 
-      'WECHAT_TOKEN',
-      'AI_API_KEY'
+      "WECHAT_APP_ID",
+      "WECHAT_APP_SECRET",
+      "WECHAT_TOKEN",
+      "AI_API_KEY",
     ];
 
-    const missingVars = requiredVars.filter(varName => !process.env[varName]);
+    const missingVars = requiredVars.filter((varName) => !process.env[varName]);
 
     if (missingVars.length > 0) {
-      throw new Error(`缺少必需的环境变量: ${missingVars.join(', ')}`);
+      throw new Error(`缺少必需的环境变量: ${missingVars.join(", ")}`);
     }
   }
 
   private logConfigSummary(): void {
-    console.log('📋 配置摘要:');
+    console.log("📋 配置摘要:");
     console.log(`  🤖 AI提供商: ${this.config.ai.provider}`);
-    console.log(`  🌤️ 天气服务: ${this.config.services.weather.enabled ? '启用' : '禁用'}`);
-    console.log(`  📈 股票服务: ${this.config.services.stock.enabled ? '启用' : '禁用'}`);
-    console.log(`  📅 每日推送: ${this.config.dailyPush.users.length > 0 ? '已配置' : '未配置'} (${this.config.dailyPush.users.length} 用户)`);
+    console.log(
+      `  🌤️ 天气服务: ${this.config.services.weather.enabled ? "启用" : "禁用"}`
+    );
+    console.log(
+      `  📈 股票服务: ${this.config.services.stock.enabled ? "启用" : "禁用"}`
+    );
+    console.log(
+      `  📅 每日推送: ${
+        this.config.dailyPush.users.length > 0 ? "已配置" : "未配置"
+      } (${this.config.dailyPush.users.length} 用户)`
+    );
     console.log(`  ⏰ 推送时间: ${this.config.dailyPush.time}`);
-    console.log(`  🎯 推送服务: ${this.config.dailyPush.services.join(', ')}`);
+    console.log(`  🎯 推送服务: ${this.config.dailyPush.services.join(", ")}`);
   }
 
   public getConfig(): BotConfig {
@@ -103,14 +115,14 @@ export class ConfigManager {
 
   public updateConfig(updates: Partial<BotConfig>): void {
     this.config = { ...this.config, ...updates };
-    console.log('🔄 配置已更新');
+    console.log("🔄 配置已更新");
   }
 
   public updateServiceConfig(serviceName: string, config: any): void {
     if (this.config.services[serviceName]) {
       this.config.services[serviceName] = {
         ...this.config.services[serviceName],
-        config
+        config,
       };
       console.log(`🔄 服务 ${serviceName} 配置已更新`);
     } else {

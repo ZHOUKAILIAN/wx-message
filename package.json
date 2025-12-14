@@ -8,6 +8,7 @@
     "start:v2": "tsx src/index-v2.ts",
     "dev": "tsx --watch src/index.ts",
     "dev:v2": "tsx --watch src/index-v2.ts",
+    "check:ai": "tsx src/tools/check-ai.ts",
     "build": "tsc",
     "build:v2": "tsc"
   },
