@@ -100,9 +100,6 @@ export class WeChatBot {
     const toUser = message.ToUserName[0];
     const content = message.Content ? message.Content[0] : "";
     const msgType = message.MsgType[0];
-
-    console.log("📨 收到消息:", { fromUser, msgType, content });
-
     let replyContent = "";
 
     if (msgType === "text") {
@@ -128,16 +125,13 @@ export class WeChatBot {
     }
 
     // 构建回复XML
-    const timestamp = Math.floor(Date.now() / 1000);
     const replyXml = `<xml>
 <ToUserName><![CDATA[${fromUser}]]></ToUserName>
 <FromUserName><![CDATA[${toUser}]]></FromUserName>
-<CreateTime>${timestamp}</CreateTime>
+<CreateTime>${Math.floor(Date.now() / 1000)}</CreateTime>
 <MsgType><![CDATA[text]]></MsgType>
 <Content><![CDATA[${replyContent}]]></Content>
 </xml>`;
-
-    console.log("📤 准备回复:", replyContent.substring(0, 100) + "...");
     console.log("📤 回复XML:", replyXml);
     return replyXml;
   }
